@@ -13,8 +13,9 @@ where actor_id <= 40 and a.actor_id >= 30;
 --4. Obtén las películas cuyo idioma coincide con el idioma original.
 
 select title
-from film f 
-where language_id = f.original_language_id ;
+from film f
+where f.original_language_id is not null and f.language_id = f.original_language_id;
+
 
 --5. Ordena las películas por duración de forma ascendente.
 
@@ -26,7 +27,7 @@ order by f.length ;
 
 select concat(a.first_name , ' ' , a.last_name) as nombre_actor 
 from actor a
-where a.last_name ='ALLEN' ;
+where a.last_name like 'ALLEN';
 
 --7. Encuentra la cantidad total de películas en cada clasificación de la tabla “filmˮ y muestra la clasificación junto con el recuento.
 
@@ -54,7 +55,9 @@ from film f ;
 
 select p.amount , p.payment_date 
 from payment p 
-order by p.payment_date desc;
+order by p.payment_date desc
+limit 1
+offset 1;
 
 --12.Encuentra el título de las películas en la tabla “filmˮ que no sean ni ‘NC-17ʼ ni ‘Gʼ en cuanto a su clasificación.
 
@@ -150,9 +153,10 @@ where length > (
 
 --25. Averigua el número de alquileres registrados por mes.´
 
-select extract(year from rental.rental_date ) as año_alquiler, count(rental_id) as numero_alquileres
+select extract(month from rental.rental_date ) as mes_alquiler, extract(year from rental.rental_date ) as año_alquiler, count(rental_id) as numero_alquileres
 from rental
-group by año_alquiler;
+group by año_alquiler, mes_alquiler
+order by año_alquiler;
 
 --26. Encuentra el promedio, la desviación estándar y varianza del total pagado.
 
@@ -179,13 +183,17 @@ where amount > (
 
 --28. Muestra el id de los actores que hayan participado en más de 40 películas.
 
-select concat(a.first_name , ' ' , a.last_name ) as nombre_actor, count(a.actor_id) as numero_peliculas
+select *
+from actor a 
+where a.first_name ='WALTER';
+
+select a.actor_id , count(concat(a.first_name , ' ' , a.last_name )) 
 from film f  
 join film_actor fa 
 	on f.film_id = fa.film_id
 join actor a 
 	on a.actor_id = fa.actor_id
-group by nombre_actor 
+group by a.actor_id  
 having count(a.actor_id) > 40;
 
 --29. Obtener todas las películas y, si están disponibles en el inventario, mostrar la cantidad disponible.
@@ -194,9 +202,8 @@ select title, count(f.film_id ) as numero_disponible
 from film f 
 join inventory i 
 	on f.film_id = i.film_id
-join store s 
+left join store s 
 	on i.store_id = s.store_id
-where s.store_id = 1
 group by f.title ;
 
 --30. Obtener los actores y el número de películas en las que ha actuado.
@@ -211,22 +218,26 @@ group by nombre_actor ;
 
 --31. Obtener todas las películas y mostrar los actores que han actuado en ellas, incluso si algunas películas no tienen actores asociados.
 
-select  f.title, concat(a.first_name, ' ' ,a.last_name) as nombre_actor
+select  f.title, string_agg(a.first_name || ' ' || a.last_name, ', ') as nombre_actor
 from film f 
 full join film_actor fa 
 	on f.film_id = fa.film_id
 full join actor a 
 	on fa.actor_id = a.actor_id
+group by f.film_id, f.title
 order by title;
 
 --32. Obtener todos los actores y mostrar las películas en las que han actuado, incluso si algunos actores no han actuado en ninguna película.
 
-select  concat(a.first_name, ' ' ,a.last_name) as nombre_actor,f.title
-from film f 
-full join film_actor fa 
-	on f.film_id = fa.film_id
-full join actor a 
-	on fa.actor_id = a.actor_id
+select 
+    a.first_name || ' ' || a.last_name as nombre_actor,
+    string_agg(f.title, ', ' order by f.title) as peliculas
+from actor a
+left join film_actor fa 
+	on a.actor_id = fa.actor_id
+left join film f 
+	on fa.film_id = f.film_id
+group by a.actor_id, a.first_name, a.last_name
 order by nombre_actor;
 
 --33. Obtener todas las películas que tenemos y todos los registros de alquiler.
@@ -328,11 +339,11 @@ where c."name" = 'Action';
 
 select concat(a.first_name, ' ' ,a.last_name) as nombre_actor, f.title
 from film f 
-full join film_actor fa 
+left join film_actor fa 
 	on f.film_id = fa.film_id
-full join actor a 
+left join actor a 
 	on fa.actor_id = a.actor_id
-where f.title = null
+where f.title is null
 order by nombre_actor ;
 
 --47. Selecciona el nombre de los actores y la cantidad de películas en las que han participado.
@@ -400,13 +411,13 @@ create temporary table peliculas_alquiladas as
 
 select distinct f.title
 from customer c
-join store s 
-	on c.store_id = s.store_id
+join rental r 
+	on c.customer_id  = r.customer_id 
 join inventory i 
-	on s.store_id = i.store_id
+	on r.inventory_id = i.inventory_id 
 join film f 
 	on i.film_id = f.film_id
-where c.first_name  = 'TAMMY' and c.last_name = 'SANDERS'and s.store_id = 2
+where c.first_name  = 'TAMMY' and c.last_name = 'SANDERS' and r.rental_date is null
 order by f.title ;
 
 --54. Encuentra los nombres de los actores que han actuado en al menos una película que pertenece a la categoría ‘Sci-Fiʼ. Ordena los resultados alfabéticamente por apellido.
@@ -474,14 +485,16 @@ where (date(return_date) - date(rental_date)) > 8;
 select title
 from film
 where film_id IN (
-  select category_id
-  from category c 
-  where c."name"  = 'Animation'
+	select fc.film_id
+    from film_category fc
+    join category c 
+    	on fc.category_id = c.category_id
+    where c.name = 'Animation'
 );
 
 --59. Encuentra los nombres de las películas que tienen la misma duración que la película con el título ‘Dancing Feverʼ. Ordena los resultados alfabéticamente por título de película.
 
-select *
+select f.title
 from film f 
 where length = (
 	select film.length 
@@ -505,34 +518,37 @@ order by c.last_name;
 
 --61. Encuentra la cantidad total de películas alquiladas por categoría y muestra el nombre de la categoría junto con el recuento de alquileres.
 
-select c.name AS categoria,
+select c.name as categoria,
        (
          select COUNT(*) 
-         from film_category fc
+         from rental r
+         join inventory i 
+         	on r.inventory_id = i.inventory_id
+         join film_category fc 
+         	on i.film_id = fc.film_id
          where fc.category_id = c.category_id
-       ) as total_peliculas
+       ) as total_alquileres
 from category c;
 
 --62. Encuentra el número de películas por categoría estrenadas en 2006.
 
 select c.name as categoria,
        (
-         select COUNT(*) 
+         select count(*)
          from film_category fc
-         where fc.category_id = c.category_id 
+         join film f 
+         	on fc.film_id = f.film_id
+         where fc.category_id = c.category_id
+           and f.release_year = 2006
        ) as total_peliculas
 from category c
-where (
-	select release_year
-	from film f
-	where f.film_id = c.category_id
-) = 2006;
+order by c.name;
 
 --63. Obtén todas las combinaciones posibles de trabajadores con las tiendas que tenemos.
 
 select *
 from staff s 
-cross join address a ;
+cross join store s2  ;
 
 --64. Encuentra la cantidad total de películas alquiladas por cada cliente y muestra el ID del cliente, su nombre y apellido junto con la cantidad de películas alquiladas.
 
@@ -540,4 +556,4 @@ select r.customer_id ,concat(c.first_name, ' ', c.last_name) as nombre_cliente, 
 from rental r 
 join customer c 
 	on r.customer_id = c.customer_id
-group by nombre_cliente,r.customer_id  ;
+group by nombre_cliente,r.customer_id;
