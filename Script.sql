@@ -27,7 +27,7 @@ order by f.length ;
 
 select concat(a.first_name , ' ' , a.last_name) as nombre_actor 
 from actor a
-where a.last_name like 'ALLEN';
+where a.last_name like '%ALLEN%';
 
 --7. Encuentra la cantidad total de películas en cada clasificación de la tabla “filmˮ y muestra la clasificación junto con el recuento.
 
@@ -57,7 +57,7 @@ select p.amount , p.payment_date
 from payment p 
 order by p.payment_date desc
 limit 1
-offset 1;
+offset 2;
 
 --12.Encuentra el título de las películas en la tabla “filmˮ que no sean ni ‘NC-17ʼ ni ‘Gʼ en cuanto a su clasificación.
 
@@ -200,7 +200,7 @@ having count(a.actor_id) > 40;
 
 select title, count(f.film_id ) as numero_disponible
 from film f 
-join inventory i 
+left join inventory i 
 	on f.film_id = i.film_id
 left join store s 
 	on i.store_id = s.store_id
@@ -337,14 +337,12 @@ where c."name" = 'Action';
 
 --46.  Encuentra todos los actores que no han participado en películas.
 
-select concat(a.first_name, ' ' ,a.last_name) as nombre_actor, f.title
-from film f 
+select CONCAT(a.first_name, ' ', a.last_name) as nombre_actor
+from actor a
 left join film_actor fa 
-	on f.film_id = fa.film_id
-left join actor a 
-	on fa.actor_id = a.actor_id
-where f.title is null
-order by nombre_actor ;
+	on a.actor_id = fa.actor_id
+where fa.film_id IS NULL
+order by nombre_actor;
 
 --47. Selecciona el nombre de los actores y la cantidad de películas en las que han participado.
 
@@ -417,7 +415,7 @@ join inventory i
 	on r.inventory_id = i.inventory_id 
 join film f 
 	on i.film_id = f.film_id
-where c.first_name  = 'TAMMY' and c.last_name = 'SANDERS' and r.rental_date is null
+where c.first_name  = 'TAMMY' and c.last_name = 'SANDERS' and r.return_date is null
 order by f.title ;
 
 --54. Encuentra los nombres de los actores que han actuado en al menos una película que pertenece a la categoría ‘Sci-Fiʼ. Ordena los resultados alfabéticamente por apellido.
@@ -557,3 +555,4 @@ from rental r
 join customer c 
 	on r.customer_id = c.customer_id
 group by nombre_cliente,r.customer_id;
+
